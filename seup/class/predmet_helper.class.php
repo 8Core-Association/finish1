@@ -629,7 +629,7 @@ class Predmet_helper
                     }
                     $tooltip_text = 'Pošiljatelj: ' . htmlspecialchars($doc->posiljatelj_naziv ?? 'N/A');
                     if ($datum_zap_formatted) {
-                        $tooltip_text .= '\nDatum: ' . $datum_zap_formatted;
+                        $tooltip_text .= ' | Datum: ' . $datum_zap_formatted;
                     }
                     $documentTableHTML .= '<i class="fas fa-check-circle" style="color: #10b981; font-size: 16px;" title="' . $tooltip_text . '"></i>';
                 } else {
