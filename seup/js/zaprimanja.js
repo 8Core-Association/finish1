@@ -5,6 +5,8 @@
     let selectedPosiljatelj = null;
 
     document.addEventListener('DOMContentLoaded', function() {
+        console.log('Zaprimanja.js loaded');
+
         const zaprimiBtn = document.getElementById('zaprimiDokumentBtn');
         const modal = document.getElementById('zaprimiDokumentModal');
         const closeModalBtn = document.getElementById('closeZaprimanjeModal');
@@ -15,6 +17,13 @@
         const posiljateljSearchInput = document.getElementById('posiljatelj_search');
         const posiljateljDropdown = document.getElementById('posiljatelj_dropdown');
         const fkPosiljateljInput = document.getElementById('fk_posiljatelj');
+
+        console.log('Elements found:', {
+            zaprimiBtn: !!zaprimiBtn,
+            modal: !!modal,
+            zaprimanjeForm: !!zaprimanjeForm,
+            submitBtn: !!document.getElementById('submitZaprimanjeBtn')
+        });
 
         if (zaprimiBtn) {
             zaprimiBtn.addEventListener('click', function() {
@@ -172,15 +181,26 @@
         }
 
         const submitZaprimanjeBtn = document.getElementById('submitZaprimanjeBtn');
-        if (submitZaprimanjeBtn && zaprimanjeForm) {
+        if (submitZaprimanjeBtn) {
+            console.log('Submit button found, attaching click handler');
             submitZaprimanjeBtn.addEventListener('click', function(e) {
+                console.log('Submit button clicked');
                 e.preventDefault();
 
-                const originalText = this.innerHTML;
-                this.disabled = true;
-                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Zaprimanje...';
+                const form = document.getElementById('zaprimanjeForm');
+                if (!form) {
+                    console.error('Form not found');
+                    return;
+                }
 
-                const formData = new FormData(zaprimanjeForm);
+                console.log('Form found, submitting...');
+
+                const originalText = submitZaprimanjeBtn.innerHTML;
+                submitZaprimanjeBtn.disabled = true;
+                submitZaprimanjeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Zaprimanje...';
+
+                const formData = new FormData(form);
+                console.log('FormData created');
 
                 fetch(window.location.href, {
                     method: 'POST',
