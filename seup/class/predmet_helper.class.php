@@ -462,7 +462,7 @@ class Predmet_helper
         $relative_path = self::getPredmetFolderPath($caseId, $db);
         
         // Get documents from ECM database
-        $sql = "SELECT 
+        $sql = "SELECT
                     ef.rowid,
                     ef.filename,
                     ef.filepath,
@@ -476,13 +476,17 @@ class Predmet_helper
                     a.ID_akta,
                     p.prilog_rbr,
                     p.ID_akta as prilog_akt_id,
-                    CONCAT(u.firstname, ' ', u.lastname) as created_by
+                    CONCAT(u.firstname, ' ', u.lastname) as created_by,
+                    z.ID_zaprimanja,
+                    z.posiljatelj_naziv,
+                    z.datum_zaprimanja
                 FROM " . MAIN_DB_PREFIX . "ecm_files ef
                 LEFT JOIN " . MAIN_DB_PREFIX . "user u ON ef.fk_user_c = u.rowid
                 LEFT JOIN " . MAIN_DB_PREFIX . "a_akti a ON ef.rowid = a.fk_ecm_file
                 LEFT JOIN " . MAIN_DB_PREFIX . "a_prilozi p ON ef.rowid = p.fk_ecm_file
+                LEFT JOIN " . MAIN_DB_PREFIX . "a_zaprimanje z ON ef.rowid = z.fk_ecm_file
                 WHERE ef.filepath = '" . $db->escape(rtrim($relative_path, '/')) . "'
-                AND ef.entity = " . $conf->entity . "
+                AND ef.entity = " . $conf->entity . ""
                 ORDER BY 
                     CASE 
                         WHEN a.urb_broj IS NOT NULL THEN CAST(a.urb_broj AS UNSIGNED)
@@ -515,6 +519,7 @@ class Predmet_helper
             $documentTableHTML .= '<th style="width: 40px;"><input type="checkbox" id="selectAllDocs" title="Označi sve"></th>';
             $documentTableHTML .= '<th><i class="fas fa-hashtag me-2"></i>&nbsp;Urb.</th>';
             $documentTableHTML .= '<th><i class="fas fa-file me-2"></i>&nbsp;Naziv datoteke</th>';
+            $documentTableHTML .= '<th style="width: 60px; text-align: center;"><i class="fas fa-inbox me-2"></i>&nbsp;ZAP</th>';
             $documentTableHTML .= '<th><i class="fas fa-calendar me-2"></i>&nbsp;Datum</th>';
             $documentTableHTML .= '<th><i class="fas fa-user me-2"></i>&nbsp;Kreirao</th>';
             $documentTableHTML .= '<th><i class="fas fa-certificate me-2"></i>&nbsp;Potpis</th>';
@@ -613,6 +618,23 @@ class Predmet_helper
                 }
 
                 $documentTableHTML .= '</div>';
+                $documentTableHTML .= '</td>';
+
+                // Zaprimljeno column
+                $documentTableHTML .= '<td style="text-align: center;">';
+                if (!empty($doc->ID_zaprimanja)) {
+                    $datum_zap_formatted = '';
+                    if (!empty($doc->datum_zaprimanja)) {
+                        $datum_zap_formatted = date('d.m.Y', strtotime($doc->datum_zaprimanja));
+                    }
+                    $tooltip_text = 'Pošiljatelj: ' . htmlspecialchars($doc->posiljatelj_naziv ?? 'N/A');
+                    if ($datum_zap_formatted) {
+                        $tooltip_text .= '\nDatum: ' . $datum_zap_formatted;
+                    }
+                    $documentTableHTML .= '<i class="fas fa-check-circle" style="color: #10b981; font-size: 16px;" title="' . $tooltip_text . '"></i>';
+                } else {
+                    $documentTableHTML .= '<i class="fas fa-minus-circle" style="color: #d1d5db; font-size: 14px;" title="Nije zaprimljeno"></i>';
+                }
                 $documentTableHTML .= '</td>';
 
                 // Date formatting
