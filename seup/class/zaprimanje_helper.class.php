@@ -24,6 +24,7 @@ class Zaprimanje_Helper
         $fk_posiljatelj = null,
         $posiljatelj_broj = null,
         $fk_akt_za_prilog = null,
+        $fk_potvrda_ecm_file = null,
         $napomena = null
     ) {
         $sql = "INSERT INTO " . MAIN_DB_PREFIX . "a_zaprimanje (
@@ -36,6 +37,7 @@ class Zaprimanje_Helper
                     nacin_zaprimanja,
                     tip_dokumenta,
                     fk_akt_za_prilog,
+                    fk_potvrda_ecm_file,
                     napomena,
                     fk_user_creat
                 ) VALUES (
@@ -48,6 +50,7 @@ class Zaprimanje_Helper
                     '" . $db->escape($nacin_zaprimanja) . "',
                     '" . $db->escape($tip_dokumenta) . "',
                     " . ($fk_akt_za_prilog ? (int)$fk_akt_za_prilog : "NULL") . ",
+                    " . ($fk_potvrda_ecm_file ? (int)$fk_potvrda_ecm_file : "NULL") . ",
                     " . ($napomena ? "'" . $db->escape($napomena) . "'" : "NULL") . ",
                     " . (int)$fk_user_creat . "
                 )";
@@ -59,6 +62,45 @@ class Zaprimanje_Helper
         }
 
         return false;
+    }
+
+    public static function ensurePotvrdaColumn($db)
+    {
+        $sql = "SHOW COLUMNS FROM " . MAIN_DB_PREFIX . "a_zaprimanje LIKE 'fk_potvrda_ecm_file'";
+        $resql = $db->query($sql);
+
+        if ($resql && $db->num_rows($resql) == 0) {
+            $alter_sql = "ALTER TABLE " . MAIN_DB_PREFIX . "a_zaprimanje
+                          ADD COLUMN fk_potvrda_ecm_file INT(11) DEFAULT NULL AFTER fk_akt_za_prilog,
+                          ADD KEY fk_potvrda (fk_potvrda_ecm_file)";
+            $db->query($alter_sql);
+            dol_syslog("Zaprimanje_Helper::ensurePotvrdaColumn - Column added", LOG_INFO);
+        }
+    }
+
+    public static function getAllPosiljateljiForAutocomplete($db)
+    {
+        $posiljatelji = [];
+        $sql = "SELECT rowid, naziv, adresa, oib, telefon, email, kontakt_osoba
+                FROM " . MAIN_DB_PREFIX . "a_posiljatelji
+                ORDER BY naziv ASC";
+
+        $resql = $db->query($sql);
+        if ($resql) {
+            while ($obj = $db->fetch_object($resql)) {
+                $posiljatelji[] = [
+                    'rowid' => $obj->rowid,
+                    'naziv' => $obj->naziv,
+                    'adresa' => $obj->adresa ?? '',
+                    'oib' => $obj->oib ?? '',
+                    'telefon' => $obj->telefon ?? '',
+                    'email' => $obj->email ?? '',
+                    'kontakt_osoba' => $obj->kontakt_osoba ?? ''
+                ];
+            }
+        }
+
+        return $posiljatelji;
     }
 
     public static function getZaprimanjaPoPredmetu($db, $ID_predmeta)
@@ -75,6 +117,7 @@ class Zaprimanje_Helper
                     z.nacin_zaprimanja,
                     z.tip_dokumenta,
                     z.fk_akt_za_prilog,
+                    z.fk_potvrda_ecm_file,
                     z.napomena,
                     z.datum_kreiranja,
                     u.firstname,
@@ -84,12 +127,17 @@ class Zaprimanje_Helper
                     p.naziv as posiljatelj_full_naziv,
                     p.adresa as posiljatelj_adresa,
                     p.email as posiljatelj_email,
-                    a.urb_broj as akt_urb_broj
+                    p.telefon as posiljatelj_telefon,
+                    p.oib as posiljatelj_oib,
+                    a.urb_broj as akt_urb_broj,
+                    pot.filename as potvrda_filename,
+                    pot.filepath as potvrda_filepath
                 FROM " . MAIN_DB_PREFIX . "a_zaprimanje z
                 LEFT JOIN " . MAIN_DB_PREFIX . "user u ON z.fk_user_creat = u.rowid
                 LEFT JOIN " . MAIN_DB_PREFIX . "ecm_files e ON z.fk_ecm_file = e.rowid
                 LEFT JOIN " . MAIN_DB_PREFIX . "a_posiljatelji p ON z.fk_posiljatelj = p.rowid
                 LEFT JOIN " . MAIN_DB_PREFIX . "a_akti a ON z.fk_akt_za_prilog = a.ID_akta
+                LEFT JOIN " . MAIN_DB_PREFIX . "ecm_files pot ON z.fk_potvrda_ecm_file = pot.rowid
                 WHERE z.ID_predmeta = " . (int)$ID_predmeta . "
                 ORDER BY z.datum_zaprimanja DESC, z.datum_kreiranja DESC";
 
@@ -288,15 +336,12 @@ class Zaprimanje_Helper
         return $results;
     }
 
-    public static function uploadZaprimljenDokument($db, $conf, $file, $ID_predmeta, $datum_zaprimanja)
+    public static function uploadZaprimljenDokument($db, $conf, $file, $ID_predmeta)
     {
         require_once DOL_DOCUMENT_ROOT . '/ecm/class/ecmfiles.class.php';
+        require_once __DIR__ . '/predmet_helper.class.php';
 
-        $date = new DateTime($datum_zaprimanja);
-        $year = $date->format('Y');
-        $month = $date->format('m');
-
-        $relative_path = 'SEUP/Zaprimanja/' . $year . '/' . $month;
+        $relative_path = Predmet_helper::getPredmetFolderPath($ID_predmeta, $db);
         $full_path = DOL_DATA_ROOT . '/ecm/' . $relative_path;
 
         if (!is_dir($full_path)) {
@@ -314,12 +359,54 @@ class Zaprimanje_Helper
         }
 
         $ecmfile = new EcmFiles($db);
-        $ecmfile->filepath = $relative_path;
+        $ecmfile->filepath = rtrim($relative_path, '/');
         $ecmfile->filename = $filename;
         $ecmfile->label = 'Zaprimljeni dokument';
         $ecmfile->fullpath_orig = $file['name'];
         $ecmfile->gen_or_uploaded = 'uploaded';
         $ecmfile->description = 'Zaprimljeni dokument - Predmet ID: ' . $ID_predmeta;
+        $ecmfile->entity = $conf->entity;
+
+        $result = $ecmfile->create($GLOBALS['user']);
+
+        if ($result > 0) {
+            return $ecmfile->id;
+        }
+
+        return false;
+    }
+
+    public static function uploadPotvrdaZaprimanja($db, $conf, $file, $datum_zaprimanja)
+    {
+        require_once DOL_DOCUMENT_ROOT . '/ecm/class/ecmfiles.class.php';
+
+        $date = new DateTime($datum_zaprimanja);
+        $year = $date->format('Y');
+
+        $relative_path = 'SEUP/Zaprimanja/' . $year;
+        $full_path = DOL_DATA_ROOT . '/ecm/' . $relative_path;
+
+        if (!is_dir($full_path)) {
+            require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+            dol_mkdir($full_path);
+        }
+
+        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $safe_filename = preg_replace('/[^a-zA-Z0-9_.-]/', '_', pathinfo($file['name'], PATHINFO_FILENAME));
+        $filename = 'potvrda_' . date('YmdHis') . '_' . $safe_filename . '.' . $extension;
+        $dest_file = $full_path . '/' . $filename;
+
+        if (!move_uploaded_file($file['tmp_name'], $dest_file)) {
+            return false;
+        }
+
+        $ecmfile = new EcmFiles($db);
+        $ecmfile->filepath = $relative_path;
+        $ecmfile->filename = $filename;
+        $ecmfile->label = 'Potvrda zaprimanja';
+        $ecmfile->fullpath_orig = $file['name'];
+        $ecmfile->gen_or_uploaded = 'uploaded';
+        $ecmfile->description = 'Potvrda zaprimanja dokumentacije';
         $ecmfile->entity = $conf->entity;
 
         $result = $ecmfile->create($GLOBALS['user']);
