@@ -114,6 +114,7 @@ class Predmet_View
     {
         require_once __DIR__ . '/zaprimanje_helper.class.php';
 
+        Zaprimanje_Helper::ensureZaprimanjaTable($db);
         $zaprimanja = Zaprimanje_Helper::getZaprimanjaPoPredmetu($db, $ID_predmeta);
 
         print '<div class="seup-tab-pane" id="zaprimanja">';

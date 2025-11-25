@@ -12,6 +12,50 @@
 
 class Zaprimanje_Helper
 {
+    public static function ensureZaprimanjaTable($db)
+    {
+        $table_name = MAIN_DB_PREFIX . "a_zaprimanje";
+
+        $sql_check = "SHOW TABLES LIKE '" . $table_name . "'";
+        $resql = $db->query($sql_check);
+
+        if ($resql && $db->num_rows($resql) == 0) {
+            $sql = "CREATE TABLE IF NOT EXISTS " . $table_name . " (
+                ID_zaprimanja INT(11) NOT NULL AUTO_INCREMENT,
+                ID_predmeta INT(11) NOT NULL COMMENT 'Veza na a_predmet',
+                fk_ecm_file INT(11) DEFAULT NULL COMMENT 'Link na zaprimljeni dokument',
+                tip_dokumenta VARCHAR(50) DEFAULT 'nedodjeljeno' COMMENT 'Tip dokumenta',
+                fk_posiljatelj INT(11) DEFAULT NULL COMMENT 'Link na a_posiljatelji',
+                posiljatelj_naziv VARCHAR(255) DEFAULT NULL COMMENT 'Naziv pošiljatelja',
+                posiljatelj_broj VARCHAR(100) DEFAULT NULL COMMENT 'Broj pošiljke',
+                datum_zaprimanja DATE NOT NULL COMMENT 'Datum zaprimanja',
+                nacin_zaprimanja VARCHAR(50) DEFAULT 'posta' COMMENT 'Način zaprimanja',
+                fk_akt_za_prilog INT(11) DEFAULT NULL COMMENT 'Link na akt ako je prilog',
+                fk_potvrda_ecm_file INT(11) DEFAULT NULL COMMENT 'Link na potvrdu',
+                napomena TEXT COMMENT 'Napomena',
+                fk_user_creat INT(11) NOT NULL COMMENT 'Kreator',
+                datum_kreiranja DATETIME DEFAULT CURRENT_TIMESTAMP,
+                entity INT(11) NOT NULL DEFAULT 1,
+                PRIMARY KEY (ID_zaprimanja),
+                KEY idx_predmet (ID_predmeta),
+                KEY idx_posiljatelj (fk_posiljatelj),
+                KEY idx_ecm_file (fk_ecm_file),
+                KEY idx_datum (datum_zaprimanja),
+                KEY fk_user (fk_user_creat),
+                KEY fk_potvrda (fk_potvrda_ecm_file)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+
+            $result = $db->query($sql);
+            if (!$result) {
+                dol_syslog("Error creating a_zaprimanje table: " . $db->lasterror(), LOG_ERR);
+                return false;
+            }
+            dol_syslog("Table a_zaprimanje created successfully", LOG_INFO);
+        }
+
+        return true;
+    }
+
     public static function registrirajZaprimanje(
         $db,
         $fk_ecm_file,

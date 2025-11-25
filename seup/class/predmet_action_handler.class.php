@@ -628,6 +628,7 @@ class Predmet_Action_Handler
         require_once __DIR__ . '/zaprimanje_helper.class.php';
 
         try {
+            Zaprimanje_Helper::ensureZaprimanjaTable($db);
             Zaprimanje_Helper::ensurePotvrdaColumn($db);
 
             if (!isset($_FILES['dokument_file']) || $_FILES['dokument_file']['error'] !== UPLOAD_ERR_OK) {
