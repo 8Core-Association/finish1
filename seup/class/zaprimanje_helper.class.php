@@ -16,17 +16,28 @@ class Zaprimanje_Helper
         $db,
         $fk_ecm_file,
         $ID_predmeta,
-        $posiljatelj_naziv,
+        $tip_dokumenta,
+        $fk_posiljatelj,
         $datum_zaprimanja,
         $nacin_zaprimanja,
-        $tip_dokumenta,
         $fk_user_creat,
-        $fk_posiljatelj = null,
-        $posiljatelj_broj = null,
-        $fk_akt_za_prilog = null,
         $fk_potvrda_ecm_file = null,
-        $napomena = null
+        $napomena = null,
+        $posiljatelj_naziv = null,
+        $posiljatelj_broj = null,
+        $fk_akt_za_prilog = null
     ) {
+        if ($posiljatelj_naziv === null && $fk_posiljatelj) {
+            $sql_pos = "SELECT naziv FROM " . MAIN_DB_PREFIX . "a_posiljatelji WHERE rowid = " . (int)$fk_posiljatelj;
+            $resql_pos = $db->query($sql_pos);
+            if ($resql_pos && $obj_pos = $db->fetch_object($resql_pos)) {
+                $posiljatelj_naziv = $obj_pos->naziv;
+            }
+        }
+
+        if ($posiljatelj_naziv === null) {
+            $posiljatelj_naziv = 'Nepoznat pošiljatelj';
+        }
         $sql = "INSERT INTO " . MAIN_DB_PREFIX . "a_zaprimanje (
                     fk_ecm_file,
                     ID_predmeta,

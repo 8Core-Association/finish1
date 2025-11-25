@@ -121,6 +121,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Predmet_Action_Handler::handleRegistrirajOtpremu($db, $conf, $user);
             break;
 
+        case 'registriraj_zaprimanje':
+            Predmet_Action_Handler::handleRegistrirajZaprimanje($db, $conf, $user, $caseId);
+            break;
+
+        case 'search_posiljatelji':
+            Predmet_Action_Handler::handleSearchPosiljatelji($db);
+            break;
+
         case 'bulk_download_zip':
             Predmet_Action_Handler::handleBulkDownloadZip($db, $conf, $user);
             break;
@@ -156,6 +164,7 @@ Predmet_View::printTabs();
 
 print '<div class="seup-tab-content">';
 Predmet_View::printPriloziTab($documentTableHTML);
+Predmet_View::printZaprimanjaTab($db, $caseId);
 Predmet_View::printOtpremaTab($db, $caseId);
 Predmet_View::printPrepregledTab();
 Predmet_View::printStatistikeTab($predmet, $doc_count);

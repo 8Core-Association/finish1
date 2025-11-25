@@ -618,4 +618,121 @@ class Predmet_Action_Handler
         ob_end_flush();
         exit;
     }
+
+    public static function handleRegistrirajZaprimanje($db, $conf, $user, $caseId)
+    {
+        @ob_end_clean();
+        header('Content-Type: application/json');
+        ob_start();
+
+        require_once __DIR__ . '/zaprimanje_helper.class.php';
+
+        try {
+            Zaprimanje_Helper::ensurePotvrdaColumn($db);
+
+            if (!isset($_FILES['dokument_file']) || $_FILES['dokument_file']['error'] !== UPLOAD_ERR_OK) {
+                throw new Exception('Dokument nije uploadan');
+            }
+
+            $tip_dokumenta = GETPOST('tip_dokumenta', 'alpha');
+            $fk_akt_za_prilog = GETPOST('fk_akt_za_prilog', 'int');
+            $fk_posiljatelj = GETPOST('fk_posiljatelj', 'int');
+            $datum_zaprimanja = GETPOST('datum_zaprimanja', 'alpha');
+            $nacin_zaprimanja = GETPOST('nacin_zaprimanja', 'alpha');
+            $napomena = GETPOST('napomena', 'restricthtml');
+
+            if (!$tip_dokumenta || !$datum_zaprimanja || !$nacin_zaprimanja) {
+                throw new Exception('Nedostaju obavezna polja');
+            }
+
+            if ($tip_dokumenta === 'prilog_postojecem' && !$fk_akt_za_prilog) {
+                throw new Exception('Morate odabrati akt za prilog');
+            }
+
+            $fk_ecm_file = Zaprimanje_Helper::uploadZaprimljenDokument($db, $conf, $_FILES['dokument_file'], $caseId);
+            if (!$fk_ecm_file) {
+                throw new Exception('Greška pri uploadu dokumenta');
+            }
+
+            $fk_potvrda_ecm_file = null;
+            if (isset($_FILES['potvrda_file']) && $_FILES['potvrda_file']['error'] === UPLOAD_ERR_OK) {
+                $fk_potvrda_ecm_file = Zaprimanje_Helper::uploadPotvrdaZaprimanja($db, $conf, $_FILES['potvrda_file'], $datum_zaprimanja);
+            }
+
+            $zaprimanje_id = Zaprimanje_Helper::registrirajZaprimanje(
+                $db,
+                $fk_ecm_file,
+                $caseId,
+                $tip_dokumenta,
+                $fk_posiljatelj,
+                $datum_zaprimanja,
+                $nacin_zaprimanja,
+                $user->id,
+                $fk_potvrda_ecm_file,
+                $napomena
+            );
+
+            if (!$zaprimanje_id) {
+                throw new Exception('Greška pri registraciji zaprimanja: ' . $db->lasterror());
+            }
+
+            if ($tip_dokumenta === 'akt') {
+                require_once __DIR__ . '/akt_helper.class.php';
+                Akt_Helper::createAktiTable($db);
+                $akt_result = Akt_Helper::createAkt($db, $caseId, $fk_ecm_file, $user->id);
+                if (!$akt_result['success']) {
+                    throw new Exception('Greška pri kreiranju akta: ' . $akt_result['error']);
+                }
+            } elseif ($tip_dokumenta === 'prilog_postojecem') {
+                require_once __DIR__ . '/prilog_helper.class.php';
+                Prilog_Helper::createPriloziTable($db);
+                $prilog_result = Prilog_Helper::createPrilog($db, $fk_akt_za_prilog, $caseId, $fk_ecm_file, $user->id);
+                if (!$prilog_result['success']) {
+                    throw new Exception('Greška pri kreiranju priloga: ' . $prilog_result['error']);
+                }
+            }
+
+            echo json_encode([
+                'success' => true,
+                'zaprimanje_id' => $zaprimanje_id,
+                'message' => 'Dokument uspješno zaprimljen'
+            ]);
+
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        ob_end_flush();
+        exit;
+    }
+
+    public static function handleSearchPosiljatelji($db)
+    {
+        @ob_end_clean();
+        header('Content-Type: application/json');
+        ob_start();
+
+        require_once __DIR__ . '/zaprimanje_helper.class.php';
+
+        $query = GETPOST('query', 'alphanohtml');
+
+        if (strlen($query) < 2) {
+            echo json_encode(['success' => false, 'error' => 'Query too short']);
+            ob_end_flush();
+            exit;
+        }
+
+        $results = Zaprimanje_Helper::searchPosiljatelji($db, $query);
+
+        echo json_encode([
+            'success' => true,
+            'results' => $results
+        ]);
+
+        ob_end_flush();
+        exit;
+    }
 }

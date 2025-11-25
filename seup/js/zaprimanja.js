@@ -171,16 +171,14 @@
             });
         }
 
-        if (zaprimanjeForm) {
-            zaprimanjeForm.addEventListener('submit', function(e) {
+        const submitZaprimanjeBtn = document.getElementById('submitZaprimanjeBtn');
+        if (submitZaprimanjeBtn && zaprimanjeForm) {
+            submitZaprimanjeBtn.addEventListener('click', function(e) {
                 e.preventDefault();
 
-                const submitBtn = document.getElementById('submitZaprimanjeBtn');
-                if (!submitBtn) return;
-
-                const originalText = submitBtn.innerHTML;
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Zaprimanje...';
+                const originalText = this.innerHTML;
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Zaprimanje...';
 
                 const formData = new FormData(zaprimanjeForm);
 
@@ -198,15 +196,15 @@
                         }, 1000);
                     } else {
                         showMessage('Greška: ' + (data.error || 'Nepoznata greška'), 'error');
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = originalText;
+                        submitZaprimanjeBtn.disabled = false;
+                        submitZaprimanjeBtn.innerHTML = originalText;
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
                     showMessage('Greška pri zaprimanju dokumenta', 'error');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalText;
+                    submitZaprimanjeBtn.disabled = false;
+                    submitZaprimanjeBtn.innerHTML = originalText;
                 });
             });
         }

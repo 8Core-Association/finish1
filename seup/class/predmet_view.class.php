@@ -25,6 +25,7 @@ class Predmet_View
         print '<link href="/custom/seup/css/dopina_predmet.css" rel="stylesheet">';
         print '<link href="/custom/seup/css/predmet-sortiranje.css" rel="stylesheet">';
         print '<link href="/custom/seup/css/otprema.css" rel="stylesheet">';
+        print '<link href="/custom/seup/css/zaprimanja.css" rel="stylesheet">';
     }
 
     public static function printCaseDetails($predmet)
@@ -69,6 +70,7 @@ class Predmet_View
     {
         print '<div class="seup-tabs">';
         print '<button class="seup-tab active" data-tab="prilozi"><i class="fas fa-paperclip"></i>Prilozi</button>';
+        print '<button class="seup-tab" data-tab="zaprimanja"><i class="fas fa-inbox"></i>Zaprimanja</button>';
         print '<button class="seup-tab" data-tab="otprema"><i class="fas fa-paper-plane"></i>Otprema</button>';
         print '<button class="seup-tab" data-tab="prepregled"><i class="fas fa-eye"></i>Prepregled</button>';
         print '<button class="seup-tab" data-tab="statistike"><i class="fas fa-chart-bar"></i>Statistike</button>';
@@ -105,6 +107,112 @@ class Predmet_View
 
         print $documentTableHTML;
 
+        print '</div>';
+    }
+
+    public static function printZaprimanjaTab($db, $ID_predmeta)
+    {
+        require_once __DIR__ . '/zaprimanje_helper.class.php';
+
+        $zaprimanja = Zaprimanje_Helper::getZaprimanjaPoPredmetu($db, $ID_predmeta);
+
+        print '<div class="seup-tab-pane" id="zaprimanja">';
+        print '<div class="seup-zaprimanja-container">';
+
+        print '<div class="seup-zaprimanja-header">';
+        print '<h5 class="seup-documents-title"><i class="fas fa-inbox"></i>Zaprimanja Dokumenata</h5>';
+        print '<p class="seup-zaprimanja-subtitle">Pregled svih zaprimljenih dokumenata od trećih strana</p>';
+        print '<button type="button" class="seup-btn seup-btn-primary" id="zaprimiDokumentBtn" style="margin-top: 15px;">';
+        print '<i class="fas fa-plus me-2"></i>Zaprimi Novi Dokument';
+        print '</button>';
+        print '</div>';
+
+        if (empty($zaprimanja)) {
+            print '<div class="seup-empty-state">';
+            print '<i class="fas fa-inbox"></i>';
+            print '<h4>Nema zaprimljenih dokumenata</h4>';
+            print '<p>Zaprimite dokument od treće strane klikom na "Zaprimi Novi Dokument"</p>';
+            print '</div>';
+        } else {
+            print '<div class="seup-zaprimanja-list">';
+
+            foreach ($zaprimanja as $zaprimanje) {
+                $datum_formatted = date('d.m.Y', strtotime($zaprimanje->datum_zaprimanja));
+                $kreiran_formatted = date('d.m.Y H:i', strtotime($zaprimanje->datum_kreiranja));
+
+                $nacin_icon = [
+                    'posta' => 'fa-envelope',
+                    'email' => 'fa-at',
+                    'rucno' => 'fa-hand-holding',
+                    'ostalo' => 'fa-ellipsis-h'
+                ];
+
+                $nacin_text = [
+                    'posta' => 'Pošta',
+                    'email' => 'E-mail',
+                    'rucno' => 'Na ruke',
+                    'ostalo' => 'Ostalo'
+                ];
+
+                print '<div class="seup-zaprimanja-item">';
+                print '<div class="seup-zaprimanja-icon">';
+                print '<i class="fas ' . ($nacin_icon[$zaprimanje->nacin_zaprimanja] ?? 'fa-inbox') . '"></i>';
+                print '</div>';
+                print '<div class="seup-zaprimanja-content">';
+
+                print '<div class="seup-zaprimanja-main">';
+                print '<div class="seup-zaprimanja-doc-info">';
+                print '<span class="seup-doc-badge seup-doc-badge-' . $zaprimanje->tip_dokumenta . '">';
+                print '<i class="fas ' . ($zaprimanje->tip_dokumenta == 'akt' ? 'fa-file-alt' : 'fa-paperclip') . '"></i> ';
+                print strtoupper($zaprimanje->tip_dokumenta);
+                print '</span>';
+                print '<span class="seup-doc-filename">' . htmlspecialchars($zaprimanje->doc_filename) . '</span>';
+                print '</div>';
+                print '<div class="seup-zaprimanja-sender">';
+                print '<i class="fas fa-user"></i> ' . htmlspecialchars($zaprimanje->posiljatelj_naziv ?? 'N/A');
+                print '</div>';
+                print '</div>';
+
+                print '<div class="seup-zaprimanja-details">';
+                print '<div class="seup-zaprimanja-detail-item">';
+                print '<i class="fas fa-calendar"></i> ' . $datum_formatted;
+                print '</div>';
+                print '<div class="seup-zaprimanja-detail-item">';
+                print '<i class="fas ' . ($nacin_icon[$zaprimanje->nacin_zaprimanja] ?? 'fa-inbox') . '"></i> ';
+                print $nacin_text[$zaprimanje->nacin_zaprimanja] ?? 'N/A';
+                print '</div>';
+
+                if (!empty($zaprimanje->fk_potvrda_ecm_file)) {
+                    print '<div class="seup-zaprimanja-detail-item seup-zaprimanja-potvrda">';
+                    print '<i class="fas fa-check-circle" style="color: var(--success-color);"></i> ';
+                    $potvrda_full_path = rtrim($zaprimanje->potvrda_filepath, '/') . '/' . $zaprimanje->potvrda_filename;
+                    $download_url = DOL_URL_ROOT . '/document.php?modulepart=ecm&file=' . urlencode($potvrda_full_path);
+                    print '<a href="' . $download_url . '" target="_blank" class="seup-download-link" title="' . htmlspecialchars($potvrda_full_path) . '">';
+                    print '<i class="fas fa-download"></i> Preuzmi potvrdu';
+                    print '</a>';
+                    print '</div>';
+                }
+                print '</div>';
+
+                if (!empty($zaprimanje->napomena)) {
+                    print '<div class="seup-zaprimanja-napomena">';
+                    print '<i class="fas fa-comment"></i> ' . htmlspecialchars($zaprimanje->napomena);
+                    print '</div>';
+                }
+
+                print '<div class="seup-zaprimanja-footer">';
+                print '<span class="seup-zaprimanja-user">Zaprimio: ' . htmlspecialchars($zaprimanje->firstname . ' ' . $zaprimanje->lastname) . '</span>';
+                print '<span class="seup-zaprimanja-date">' . $kreiran_formatted . '</span>';
+                print '</div>';
+
+                print '</div>';
+                print '</div>';
+            }
+
+            print '</div>';
+        }
+
+        print '</div>';
         print '</div>';
     }
 
@@ -299,6 +407,7 @@ class Predmet_View
         self::printAktUploadModal($caseId);
         self::printPrilogUploadModal($caseId, $availableAkti);
         self::printRegistrirajOtpremuModal($caseId);
+        self::printZaprimiDokumentModal($caseId, $availableAkti);
     }
 
     private static function printOmotPreviewModal()
@@ -625,10 +734,109 @@ class Predmet_View
         print '</div>';
     }
 
+    private static function printZaprimiDokumentModal($caseId, $availableAkti)
+    {
+        global $db;
+        require_once __DIR__ . '/zaprimanje_helper.class.php';
+
+        print '<div class="seup-modal" id="zaprimiDokumentModal">';
+        print '<div class="seup-modal-content" style="max-width: 700px;">';
+        print '<div class="seup-modal-header">';
+        print '<h5 class="seup-modal-title"><i class="fas fa-inbox me-2"></i>Zaprimi Dokument</h5>';
+        print '<button type="button" class="seup-modal-close" id="closeZaprimanjeModal">&times;</button>';
+        print '</div>';
+        print '<div class="seup-modal-body">';
+        print '<form id="zaprimanjeForm" enctype="multipart/form-data">';
+        print '<input type="hidden" name="action" value="registriraj_zaprimanje">';
+        print '<input type="hidden" name="case_id" value="' . $caseId . '">';
+        print '<input type="hidden" name="fk_posiljatelj" id="fk_posiljatelj">';
+
+        print '<h6 class="seup-section-title"><i class="fas fa-file"></i> Dokument *</h6>';
+        print '<div class="seup-form-group">';
+        print '<label for="dokument_file" class="seup-label">Odaberite datoteku *</label>';
+        print '<input type="file" id="dokument_file" name="dokument_file" class="seup-input" accept=".pdf,.docx,.xlsx,.doc,.xls,.jpg,.jpeg,.png" required>';
+        print '<div class="seup-help-text">Podržani formati: PDF, DOCX, XLSX, DOC, XLS, JPG, PNG</div>';
+        print '</div>';
+
+        print '<div class="seup-form-group">';
+        print '<label for="tip_dokumenta" class="seup-label">Tip dokumenta *</label>';
+        print '<select id="tip_dokumenta" name="tip_dokumenta" class="seup-select" required>';
+        print '<option value="">-- Odaberite tip --</option>';
+        print '<option value="akt">Novi Akt</option>';
+        print '<option value="prilog_postojecem">Prilog postojećem aktu</option>';
+        print '<option value="nedodjeljeno">Nedodjeljeno</option>';
+        print '</select>';
+        print '</div>';
+
+        print '<div class="seup-form-group" id="akt_za_prilog_wrapper" style="display: none;">';
+        print '<label for="fk_akt_za_prilog" class="seup-label">Odaberite akt *</label>';
+        print '<select id="fk_akt_za_prilog" name="fk_akt_za_prilog" class="seup-select">';
+        print '<option value="">-- Odaberite akt --</option>';
+        if (!empty($availableAkti)) {
+            foreach ($availableAkti as $akt) {
+                print '<option value="' . $akt->ID_akta . '">';
+                print 'Akt ' . $akt->urb_broj . ' - ' . htmlspecialchars($akt->filename);
+                print '</option>';
+            }
+        }
+        print '</select>';
+        print '</div>';
+
+        print '<h6 class="seup-section-title"><i class="fas fa-user"></i> Pošiljatelj</h6>';
+        print '<div class="seup-form-group seup-autocomplete-wrapper">';
+        print '<label for="posiljatelj_search" class="seup-label">Tražite ili unesite pošiljatelja</label>';
+        print '<input type="text" id="posiljatelj_search" name="posiljatelj_search" class="seup-input" placeholder="Unesite naziv pošiljatelja...">';
+        print '<div class="seup-autocomplete-dropdown" id="posiljatelj_dropdown"></div>';
+        print '<div class="seup-help-text"><i class="fas fa-info-circle"></i> Počnite tipkati za pretragu postojećih pošiljatelja</div>';
+        print '</div>';
+
+        print '<h6 class="seup-section-title"><i class="fas fa-info-circle"></i> Dodatne Informacije *</h6>';
+        print '<div class="seup-form-row">';
+        print '<div class="seup-form-group">';
+        print '<label for="datum_zaprimanja" class="seup-label">Datum zaprimanja *</label>';
+        print '<input type="date" id="datum_zaprimanja" name="datum_zaprimanja" class="seup-input" required>';
+        print '</div>';
+        print '<div class="seup-form-group">';
+        print '<label for="nacin_zaprimanja" class="seup-label">Način zaprimanja *</label>';
+        print '<select id="nacin_zaprimanja" name="nacin_zaprimanja" class="seup-select" required>';
+        print '<option value="">-- Odaberite --</option>';
+        print '<option value="posta">Pošta</option>';
+        print '<option value="email">E-mail</option>';
+        print '<option value="rucno">Na ruke</option>';
+        print '<option value="ostalo">Ostalo</option>';
+        print '</select>';
+        print '</div>';
+        print '</div>';
+
+        print '<h6 class="seup-section-title"><i class="fas fa-paperclip"></i> Potvrda (opciono)</h6>';
+        print '<div class="seup-form-group">';
+        print '<label for="potvrda_file" class="seup-label">Upload potvrde zaprimanja</label>';
+        print '<input type="file" id="potvrda_file" name="potvrda_file" class="seup-input" accept=".pdf,.jpg,.jpeg,.png">';
+        print '<div class="seup-help-text"><i class="fas fa-info-circle"></i> Sprema se u: /Zaprimanja/' . date('Y') . '/</div>';
+        print '</div>';
+
+        print '<div class="seup-form-group">';
+        print '<label for="napomena" class="seup-label">Napomena</label>';
+        print '<textarea id="napomena" name="napomena" class="seup-textarea" rows="3"></textarea>';
+        print '</div>';
+
+        print '</form>';
+        print '</div>';
+        print '<div class="seup-modal-footer">';
+        print '<button type="button" class="seup-btn seup-btn-secondary" id="cancelZaprimanjeBtn">Odustani</button>';
+        print '<button type="button" class="seup-btn seup-btn-primary" id="submitZaprimanjeBtn">';
+        print '<i class="fas fa-save me-2"></i>Zaprimi Dokument';
+        print '</button>';
+        print '</div>';
+        print '</div>';
+        print '</div>';
+    }
+
     public static function printScripts()
     {
         print '<script src="/custom/seup/js/seup-modern.js"></script>';
         print '<script src="/custom/seup/js/predmet-sortiranje.js"></script>';
         print '<script src="/custom/seup/js/predmet.js"></script>';
+        print '<script src="/custom/seup/js/zaprimanja.js"></script>';
     }
 }
